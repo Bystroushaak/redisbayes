@@ -22,13 +22,13 @@ def test_constructor(sb):
 
 
 def test_filtering(sb):
-    sb.clean()
-    
+    sb.reset()
+
     assert sb.classify('nothing trained yet') is None
 
     sb.train('good', 'sunshine God love sex lobster sloth')
     sb.train('bad', 'fear death horror government zombie')
-    
+
     assert sb.classify('sloths are so cute i love them') == 'good'
 
     assert sb.classify('i am a zombie and love the government') == 'bad'
@@ -38,8 +38,19 @@ def test_filtering(sb):
 
     sb.untrain('good', 'sunshine God love sex lobster sloth')
     sb.untrain('bad', 'fear death horror government zombie')
-    
+
     assert not sb.score('lolcat')
+
+
+def test_reset(sb):
+    sb.train('good', 'sunshine God love sex lobster sloth')
+    sb.train('bad', 'fear death horror government zombie')
+
+    assert sb.classify('nothing trained yet')
+
+    sb.reset()
+
+    assert sb.classify('nothing trained yet') is None
 
 
 def test_tokenizer():
