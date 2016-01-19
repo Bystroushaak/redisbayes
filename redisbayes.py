@@ -55,6 +55,7 @@ ur"""
 # Imports =====================================================================
 import re
 import math
+from collections import defaultdict
 
 
 __version__ = "0.1.3"
@@ -143,12 +144,11 @@ def english_tokenizer(text):
 
 
 def occurances(words):
-    counts = {}
+    counts = defaultdict(int)
+
     for word in words:
-        if word in counts:
-            counts[word] += 1
-        else:
-            counts[word] = 1
+        counts[word] += 1
+
     return counts
 
 
