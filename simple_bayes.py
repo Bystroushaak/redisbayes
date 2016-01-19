@@ -14,7 +14,7 @@ from collections import defaultdict
 # Variables ===================================================================
 __version__ = "0.1.0"
 
-english_ignore = set("""
+english_ignore_list = set("""
 a able about above abroad according accordingly across actually adj after
 afterwards again against ago ahead ain't all allow allows almost alone along
 alongside already also although always am amid amidst among amongst an and
@@ -72,11 +72,20 @@ whilst whither who who'd whoever whole who'll whom whomever who's whose why
 will willing wish with within without wonder won't would wouldn't x y yes yet
 you you'd you'll your you're yours yourself yourselves you've z zero
 successful greatest began including being all for close but
-""".split())
+""".split())  #: Default ignore list.
 
 
 # Functions & classes =========================================================
 def tidy(text):
+    """
+    Convert `text` to unicode. Replace special characters with spaces.
+
+    Args:
+        text (str / unicode): Input sentence.
+
+    Returns:
+        unicode: Cleaned sentece.
+    """
     if not isinstance(text, basestring):
         text = str(text)
 
@@ -88,17 +97,39 @@ def tidy(text):
     return re.sub(r'[\_.,<>:;~+|\[\]?`"!@#$%^&*()\s]', ' ', text, re.UNICODE)
 
 
-def english_tokenizer(text):
+def english_tokenizer(text, ignore_list=english_ignore_list):
+    """
+    Simple english tokenizer used to split input sentence to list of words.
+
+    Words are normalized to lowercase.
+
+    Args:
+        text (str/unicode): Input sentence.
+        ignore_list (set): Set of words which wouln't be classified. Default
+            :attr:`english_ignore_list`.
+
+    Returns:
+        list: Strings / words without special characters and separators.
+    """
     words = tidy(text).split()
 
     return [
         word
         for word in words
-        if len(word) > 2 and word not in english_ignore
+        if len(word) > 2 and word not in ignore_list
     ]
 
 
 def occurances(words):
+    """
+    Count how many times is each word present in input list `words`.
+
+    Args:
+        words (list): Tokenized sentence.
+
+    Returns:
+        dict: Dictionary ``{"word": int(occurances)}``.
+    """
     counts = defaultdict(int)
 
     for word in words:
@@ -108,26 +139,80 @@ def occurances(words):
 
 
 class SimpleBayes(object):
-    def __init__(self, db_backend=None, correction=0.1, tokenizer=None):
+    """
+    Simple naive bayes classificator, which may be used for spam
+    classification.
+
+    Attributes:
+        db_backend (obj): Dict-like object used to store values.
+        correction (float): Value used as weight for unclassified words.
+        tokenizer (ref): Reference to function used for text tokenization.
+        sub_dict (ref): Reference to function used for construction of
+            sub-dicts.
+        _original_keys (set): Set of keys which were in :attr:`db_backend` when
+            the constructor was called. This is used to prevent cleaning of
+            such keys when the :meth:`reset` is called.
+    """
+    def __init__(self, db_backend=None, correction=0.1, tokenizer=None,
+                 sub_dict=dict):
+        """
+        Constructor for :class:`SimpleBayes`.
+
+        Args:
+            db_backend (dict-like object): Database connector or just plain old
+                dict. If ``None``, ``{}`` will be used. Default ``None`.
+            correction (float): Value used in classificator in case that the
+                word wasn't yet classified. Default ``0.1``.
+            tokenizer (func reference): Reference to function used for word
+                tokenization. If ``None``, :func:`english_tokenizer` is used.
+                Default ``None``.
+            sub_dict (func): Function used to construct sub-dictionaries in
+                dictionary. Default :func:`dict`.
+        """
         self.db_backend = db_backend
         self.correction = correction
         self.tokenizer = tokenizer or english_tokenizer
+        self.sub_dict = sub_dict
 
         if not self.db_backend:
             self.db_backend = {}
 
-    def clean(self):
-        for cat in self.db_backend:
+        self._original_keys = set(self.db_backend.keys())
+
+    def reset(self):
+        """
+        Remove trained set from database.
+        """
+        keys_to_remove = set(self.db_backend.keys()) - self._original_keys
+
+        for cat in keys_to_remove:
             del self.db_backend[cat]
 
     def train(self, category, text):
+        """
+        Train bayess classificator to put `text` into `category`.
+
+        Args:
+            category (str): Name of the category for `text`.
+            text (str): Classified text.
+        """
         if category not in self.db_backend:
-            self.db_backend[category] = defaultdict(int)
+            self.db_backend[category] = self.sub_dict()
 
         for word, count in occurances(self.tokenizer(text)).iteritems():
-            self.db_backend[category][word] += count
+            # defaultdict is not used to allow `self.sub_dict`
+            old = self.db_backend[category].get(word, 0)
+            self.db_backend[category][word] = old + count
 
     def untrain(self, category, text):
+        """
+        Make the classsifier forgot, that `text` belongs to `category`.
+
+        Args:
+            category (str): Name of the category into `text` which text was
+                classified by mistake.
+            text (str): Classified text.
+        """
         for word, count in occurances(self.tokenizer(text)).iteritems():
             cur = self.db_backend.get(word)
             if cur:
@@ -137,10 +222,19 @@ class SimpleBayes(object):
                 else:
                     del self.db_backend[category][word]
 
-        if self.tally(category):
+        if self._tally(category):
             del self.db_backend[category]
 
     def classify(self, text):
+        """
+        Let the classificator tell you, where the `text` should belong.
+
+        Args:
+            text (str): Sentence for classification.
+
+        Returns:
+            str: Name of the category.
+        """
         score = self.score(text)
         if not score:
             return None
@@ -148,11 +242,20 @@ class SimpleBayes(object):
         return sorted(score.iteritems(), key=lambda (k, v): v)[-1][0]
 
     def score(self, text):
+        """
+        Get score of category probability for given `text`.
+
+        Args:
+            text (str): Sentence for classification.
+
+        Returns:
+            dict: ``{"category": int(probability)}``.
+        """
         occurs = occurances(self.tokenizer(text))
 
         scores = {}
         for category in self.db_backend.keys():
-            tally = self.tally(category)
+            tally = self._tally(category)
             if tally == 0:
                 continue
 
@@ -168,7 +271,16 @@ class SimpleBayes(object):
 
         return scores
 
-    def tally(self, category):
+    def _tally(self, category):
+        """
+        Get sum of weights for all words in given `category`.
+
+        Args:
+            category (str): Name of the category learnt by :meth:`train`.
+
+        Returns:
+            int: Sum of all values in this category.
+        """
         tally = sum(self.db_backend[category].values())
 
         assert tally >= 0, "corrupt bayesian database"
