@@ -53,6 +53,14 @@ def test_reset(sb):
     assert sb.classify('nothing trained yet') is None
 
 
+def test_reset_keys():
+    s = simple_bayes.SimpleBayes(db_backend={"--1": 1})
+
+    s.reset()
+
+    assert "--1" in s.db_backend
+
+
 def test_tokenizer():
     # Words are lowercased and unicode is supported:
 
