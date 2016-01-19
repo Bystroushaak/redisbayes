@@ -1,56 +1,10 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-ur"""
-
-    redisbayes
-    ~~~~~~~~~~
-
-    Naïve Bayesian Text Classifier on Redis.
-
-    I wrote this to filter spammy comments from a high traffic forum website
-    and it worked pretty well.  It can work for you too :)
-
-    For example::
-
-        >>> import simple_bayess
-        >>> sb = simple_bayess.SimpleBayes()
-        >>> sb.clean()
-        >>> sb.classify('nothing trained yet') is None
-        True
-        >>> sb.train('good', 'sunshine God love sex lobster sloth')
-        >>> sb.train('bad', 'fear death horror government zombie')
-        >>> sb.classify('sloths are so cute i love them')
-        'good'
-        >>> sb.classify('i am a zombie and love the government')
-        'bad'
-        >>> int(sb.score('i am a zombie and love the government')['bad'])
-        -7
-        >>> int(sb.score('i am a zombie and love the government')['good'])
-        -9
-        >>> sb.untrain('good', 'sunshine God love sex lobster sloth')
-        >>> sb.untrain('bad', 'fear death horror government zombie')
-        >>> sb.score('lolcat')
-        {}
-
-    Words are lowercased and unicode is supported::
-
-        >>> print english_tokenizer("Æther")[0]
-        æther
-
-    Common english words and 1-2 character words are ignored::
-
-        >>> english_tokenizer("greetings mary a b aa bb")
-        [u'mary']
-
-    Some characters are removed::
-
-        >>> print english_tokenizer("contraction's")[0]
-        contraction's
-        >>> print english_tokenizer("what|is|goth")[0]
-        goth
-
 """
+Simple bayess classifier.
+"""
+#
 # Imports =====================================================================
 import re
 import math
@@ -58,7 +12,7 @@ from collections import defaultdict
 
 
 # Variables ===================================================================
-__version__ = "0.1.3"
+__version__ = "0.1.0"
 
 english_ignore = set("""
 a able about above abroad according accordingly across actually adj after
@@ -220,8 +174,3 @@ class SimpleBayes(object):
         assert tally >= 0, "corrupt bayesian database"
 
         return tally
-
-
-if __name__ == '__main__':
-    import doctest, sys
-    sys.exit(doctest.testmod()[0])
