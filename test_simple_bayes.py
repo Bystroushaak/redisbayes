@@ -40,6 +40,7 @@ def test_filtering(sb):
     sb.untrain('bad', 'fear death horror government zombie')
 
     assert not sb.score('lolcat')
+    assert not sb.score('kočička')
 
 
 def test_reset(sb):

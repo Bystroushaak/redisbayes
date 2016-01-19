@@ -261,11 +261,7 @@ class SimpleBayes(object):
 
             scores[category] = 0.0
             for word in occurs.keys():
-                score = self.db_backend[category].get(word)
-
-                assert not score or score > 0, "corrupt bayesian database"
-
-                score = score or self.correction
+                score = self.db_backend[category].get(word, self.correction)
 
                 scores[category] += math.log(float(score) / tally)
 
