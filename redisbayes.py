@@ -57,6 +57,7 @@ import math
 from collections import defaultdict
 
 
+# Variables ===================================================================
 __version__ = "0.1.3"
 
 english_ignore = set("""
@@ -120,6 +121,7 @@ successful greatest began including being all for close but
 """.split())
 
 
+# Functions & classes =========================================================
 def tidy(text):
     if not isinstance(text, basestring):
         text = str(text)
