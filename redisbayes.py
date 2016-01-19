@@ -123,15 +123,23 @@ successful greatest began including being all for close but
 def tidy(text):
     if not isinstance(text, basestring):
         text = str(text)
+
     if not isinstance(text, unicode):
         text = text.decode('utf8')
+
     text = text.lower()
+
     return re.sub(r'[\_.,<>:;~+|\[\]?`"!@#$%^&*()\s]', ' ', text, re.UNICODE)
 
 
 def english_tokenizer(text):
     words = tidy(text).split()
-    return [w for w in words if len(w) > 2 and w not in english_ignore]
+
+    return [
+        word
+        for word in words
+        if len(word) > 2 and word not in english_ignore
+    ]
 
 
 def occurances(words):
