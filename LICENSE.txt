@@ -1,4 +1,4 @@
-redisbayes - Naïve Bayesian Text Classifier on Redis
+Copyright (c) 2016 Bystroushaak
 Copyright (c) 2012 Justine Alexandra Roberts Tunney
 
 Permission is hereby granted, free of charge, to any person
