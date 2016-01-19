@@ -157,6 +157,7 @@ class RedisBayes(object):
         self.redis = redis
         self.correction = correction
         self.tokenizer = tokenizer or english_tokenizer
+
         if not self.redis:
             from redis import Redis
             self.redis = Redis()
@@ -164,6 +165,7 @@ class RedisBayes(object):
     def flush(self):
         for cat in self.redis.smembers('bayes:categories'):
             self.redis.delete('bayes:' + cat)
+
         self.redis.delete('bayes:categories')
 
     def train(self, category, text):
@@ -180,6 +182,7 @@ class RedisBayes(object):
                     self.redis.hset('bayes:' + category, word, new)
                 else:
                     self.redis.hdel('bayes:' + category, word)
+
         if self.tally(category) == 0:
             self.redis.delete('bayes:' + category)
             self.redis.srem('bayes:categories', category)
@@ -188,6 +191,7 @@ class RedisBayes(object):
         score = self.score(text)
         if not score:
             return None
+
         return sorted(score.iteritems(), key=lambda v: v[1])[-1][0]
 
     def score(self, text):
@@ -197,17 +201,24 @@ class RedisBayes(object):
             tally = self.tally(category)
             if tally == 0:
                 continue
+
             scores[category] = 0.0
             for word, count in occurs.iteritems():
                 score = self.redis.hget('bayes:' + category, word)
+
                 assert not score or score > 0, "corrupt bayesian database"
+
                 score = score or self.correction
+
                 scores[category] += math.log(float(score) / tally)
+
         return scores
 
     def tally(self, category):
         tally = sum(int(x) for x in self.redis.hvals('bayes:' + category))
+
         assert tally >= 0, "corrupt bayesian database"
+
         return tally
 
 
