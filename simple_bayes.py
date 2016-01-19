@@ -13,24 +13,24 @@ ur"""
 
     For example::
 
-        >>> import redisbayes
-        >>> rb = redisbayes.SimpleBayes()
-        >>> rb.clean()
-        >>> rb.classify('nothing trained yet') is None
+        >>> import simple_bayess
+        >>> sb = simple_bayess.SimpleBayes()
+        >>> sb.clean()
+        >>> sb.classify('nothing trained yet') is None
         True
-        >>> rb.train('good', 'sunshine God love sex lobster sloth')
-        >>> rb.train('bad', 'fear death horror government zombie')
-        >>> rb.classify('sloths are so cute i love them')
+        >>> sb.train('good', 'sunshine God love sex lobster sloth')
+        >>> sb.train('bad', 'fear death horror government zombie')
+        >>> sb.classify('sloths are so cute i love them')
         'good'
-        >>> rb.classify('i am a zombie and love the government')
+        >>> sb.classify('i am a zombie and love the government')
         'bad'
-        >>> int(rb.score('i am a zombie and love the government')['bad'])
+        >>> int(sb.score('i am a zombie and love the government')['bad'])
         -7
-        >>> int(rb.score('i am a zombie and love the government')['good'])
+        >>> int(sb.score('i am a zombie and love the government')['good'])
         -9
-        >>> rb.untrain('good', 'sunshine God love sex lobster sloth')
-        >>> rb.untrain('bad', 'fear death horror government zombie')
-        >>> rb.score('lolcat')
+        >>> sb.untrain('good', 'sunshine God love sex lobster sloth')
+        >>> sb.untrain('bad', 'fear death horror government zombie')
+        >>> sb.score('lolcat')
         {}
 
     Words are lowercased and unicode is supported::
@@ -155,9 +155,9 @@ def occurances(words):
 
 class SimpleBayes(object):
     def __init__(self, db_backend=None, correction=0.1, tokenizer=None):
+        self.db_backend = db_backend
         self.correction = correction
         self.tokenizer = tokenizer or english_tokenizer
-        self.db_backend = {}
 
         if not self.db_backend:
             self.db_backend = {}
@@ -191,7 +191,7 @@ class SimpleBayes(object):
         if not score:
             return None
 
-        return sorted(score.iteritems(), key=lambda v: v[1])[-1][0]
+        return sorted(score.iteritems(), key=lambda (k, v): v)[-1][0]
 
     def score(self, text):
         occurs = occurances(self.tokenizer(text))
@@ -215,10 +215,7 @@ class SimpleBayes(object):
         return scores
 
     def tally(self, category):
-        tally = sum(
-            int(x)
-            for x in self.db_backend[category].values()
-        )
+        tally = sum(self.db_backend[category].values())
 
         assert tally >= 0, "corrupt bayesian database"
 
