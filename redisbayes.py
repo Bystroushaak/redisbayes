@@ -157,6 +157,7 @@ class RedisBayes(object):
         self.redis = redis
         self.correction = correction
         self.tokenizer = tokenizer or english_tokenizer
+        self.db_backend = {}
 
         if not self.redis:
             from redis import Redis
@@ -169,23 +170,41 @@ class RedisBayes(object):
         self.redis.delete('bayes:categories')
 
     def train(self, category, text):
-        self.redis.sadd('bayes:categories', category)
+        self.redis.sadd('bayes:categories', category) # TODO: !
+        for word, count in occurances(self.tokenizer(text)).iteritems():# TODO: !
+            self.redis.hincrby('bayes:' + category, word, count)# TODO: !
+
+        if category not in self.db_backend:
+            self.db_backend[category] = defaultdict(int)
+
         for word, count in occurances(self.tokenizer(text)).iteritems():
-            self.redis.hincrby('bayes:' + category, word, count)
+            self.db_backend[category][word] += count
 
     def untrain(self, category, text):
+        for word, count in occurances(self.tokenizer(text)).iteritems():# TODO: !
+            cur = self.redis.hget('bayes:' + category, word)# TODO: !
+            if cur:# TODO: !
+                new = int(cur) - count# TODO: !
+                if new > 0:# TODO: !
+                    self.redis.hset('bayes:' + category, word, new)# TODO: !
+                else:# TODO: !
+                    self.redis.hdel('bayes:' + category, word)# TODO: !
+
         for word, count in occurances(self.tokenizer(text)).iteritems():
-            cur = self.redis.hget('bayes:' + category, word)
+            cur = self.db_backend.get(word)
             if cur:
                 new = int(cur) - count
                 if new > 0:
-                    self.redis.hset('bayes:' + category, word, new)
+                    self.db_backend[category][word] = new
                 else:
-                    self.redis.hdel('bayes:' + category, word)
+                    del self.db_backend[category][word]
 
-        if self.tally(category) == 0:
-            self.redis.delete('bayes:' + category)
-            self.redis.srem('bayes:categories', category)
+        if self.tally2(category):
+            del self.db_backend[category]
+
+        if self.tally(category) == 0:# TODO: !
+            self.redis.delete('bayes:' + category)# TODO: !
+            self.redis.srem('bayes:categories', category)# TODO: !
 
     def classify(self, text):
         score = self.score(text)
@@ -196,26 +215,53 @@ class RedisBayes(object):
 
     def score(self, text):
         occurs = occurances(self.tokenizer(text))
-        scores = {}
-        for category in self.redis.smembers('bayes:categories'):
-            tally = self.tally(category)
+
+        scores = {}# TODO: !
+        for category in self.redis.smembers('bayes:categories'):# TODO: !
+            tally = self.tally(category)# TODO: !
+            if tally == 0:# TODO: !
+                continue# TODO: !
+
+            scores[category] = 0.0# TODO: !
+            for word in occurs.keys():# TODO: !
+                score = self.redis.hget('bayes:' + category, word)# TODO: !
+
+                assert not score or score > 0, "corrupt bayesian database"# TODO: !
+
+                score = score or self.correction# TODO: !
+
+                scores[category] += math.log(float(score) / tally)# TODO: !
+
+        scores2 = {}
+        for category in self.db_backend.keys():
+            tally = self.tally2(category)
             if tally == 0:
                 continue
 
-            scores[category] = 0.0
-            for word, count in occurs.iteritems():
-                score = self.redis.hget('bayes:' + category, word)
+            scores2[category] = 0.0
+            for word in occurs.keys():
+                score = self.db_backend[category].get(word)
 
                 assert not score or score > 0, "corrupt bayesian database"
 
                 score = score or self.correction
 
-                scores[category] += math.log(float(score) / tally)
+                scores2[category] += math.log(float(score) / tally)
 
-        return scores
+        return scores2
 
     def tally(self, category):
-        tally = sum(int(x) for x in self.redis.hvals('bayes:' + category))
+        tally = sum(int(x) for x in self.redis.hvals('bayes:' + category))# TODO: !
+
+        assert tally >= 0, "corrupt bayesian database"# TODO: !
+
+        return tally# TODO: !
+
+    def tally2(self, category):
+        tally = sum(
+            int(x)
+            for x in self.db_backend[category].values()
+        )
 
         assert tally >= 0, "corrupt bayesian database"
 
