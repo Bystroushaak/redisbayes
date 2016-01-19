@@ -15,7 +15,7 @@ ur"""
 
         >>> import redis
         >>> import redisbayes
-        >>> rb = redisbayes.RedisBayes(redis.Redis(), prefix='bayes:test:')
+        >>> rb = redisbayes.RedisBayes(redis.Redis())
         >>> rb.flush()
         >>> rb.classify('nothing trained yet') is None
         True
@@ -153,10 +153,8 @@ def occurances(words):
 
 
 class RedisBayes(object):
-    def __init__(self, redis=None, prefix='bayes:', correction=0.1,
-                 tokenizer=None):
+    def __init__(self, redis=None, correction=0.1, tokenizer=None):
         self.redis = redis
-        self.prefix = prefix
         self.correction = correction
         self.tokenizer = tokenizer or english_tokenizer
         if not self.redis:
@@ -164,27 +162,27 @@ class RedisBayes(object):
             self.redis = Redis()
 
     def flush(self):
-        for cat in self.redis.smembers(self.prefix + 'categories'):
-            self.redis.delete(self.prefix + cat)
-        self.redis.delete(self.prefix + 'categories')
+        for cat in self.redis.smembers('bayes:categories'):
+            self.redis.delete('bayes:' + cat)
+        self.redis.delete('bayes:categories')
 
     def train(self, category, text):
-        self.redis.sadd(self.prefix + 'categories', category)
+        self.redis.sadd('bayes:categories', category)
         for word, count in occurances(self.tokenizer(text)).iteritems():
-            self.redis.hincrby(self.prefix + category, word, count)
+            self.redis.hincrby('bayes:' + category, word, count)
 
     def untrain(self, category, text):
         for word, count in occurances(self.tokenizer(text)).iteritems():
-            cur = self.redis.hget(self.prefix + category, word)
+            cur = self.redis.hget('bayes:' + category, word)
             if cur:
                 new = int(cur) - count
                 if new > 0:
-                    self.redis.hset(self.prefix + category, word, new)
+                    self.redis.hset('bayes:' + category, word, new)
                 else:
-                    self.redis.hdel(self.prefix + category, word)
+                    self.redis.hdel('bayes:' + category, word)
         if self.tally(category) == 0:
-            self.redis.delete(self.prefix + category)
-            self.redis.srem(self.prefix + 'categories', category)
+            self.redis.delete('bayes:' + category)
+            self.redis.srem('bayes:categories', category)
 
     def classify(self, text):
         score = self.score(text)
@@ -195,20 +193,20 @@ class RedisBayes(object):
     def score(self, text):
         occurs = occurances(self.tokenizer(text))
         scores = {}
-        for category in self.redis.smembers(self.prefix + 'categories'):
+        for category in self.redis.smembers('bayes:categories'):
             tally = self.tally(category)
             if tally == 0:
                 continue
             scores[category] = 0.0
             for word, count in occurs.iteritems():
-                score = self.redis.hget(self.prefix + category, word)
+                score = self.redis.hget('bayes:' + category, word)
                 assert not score or score > 0, "corrupt bayesian database"
                 score = score or self.correction
                 scores[category] += math.log(float(score) / tally)
         return scores
 
     def tally(self, category):
-        tally = sum(int(x) for x in self.redis.hvals(self.prefix + category))
+        tally = sum(int(x) for x in self.redis.hvals('bayes:' + category))
         assert tally >= 0, "corrupt bayesian database"
         return tally
 
