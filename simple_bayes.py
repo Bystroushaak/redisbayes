@@ -239,7 +239,7 @@ class SimpleBayes(object):
         if not score:
             return None
 
-        return sorted(score.iteritems(), key=lambda (k, v): v)[-1][0]
+        return max(score.iteritems(), key=lambda (k, v): v)[0]
 
     def score(self, text):
         """
